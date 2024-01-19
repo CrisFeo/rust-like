@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{
   Read,
   Write,
@@ -14,6 +15,8 @@ pub struct Terminal<'a> {
   old_termios: libc::termios,
   stdin: StdinLock<'a>,
   stdout: BufWriter<StdoutLock<'a>>,
+  buffer: HashMap<(i32, i32), char>,
+  screen: HashMap<(i32, i32), char>,
 }
 
 impl<'a> Drop for Terminal<'a> {
@@ -63,17 +66,35 @@ impl<'a> Terminal<'a> {
       old_termios,
       stdin: stdin().lock(),
       stdout,
+      buffer: HashMap::new(),
+      screen: HashMap::new(),
     };
     write!(t.stdout, "\x1b[?25l")?; // hide cursor
     write!(t.stdout, "\x1b[s")?; // save cursor
     write!(t.stdout, "\x1b[?47h")?; // save screen
     write!(t.stdout, "\x1b[?1049h")?; // enter alt screen
-		t.clear()?;
-		t.flush()?;
+    write!(t.stdout, "\x1b[2J")?; // clear screen
+		t.stdout.flush()?;
     Ok(t)
   }
 
-  pub fn flush(&mut self) -> Result<()> {
+  pub fn set(&mut self, x: i32, y: i32, c: char) {
+    self.buffer.insert((x + 1, y + 1), c);
+  }
+
+  pub fn present(&mut self) -> Result<()> {
+    for ((col, row), char) in self.buffer.iter() {
+      write!(self.stdout, "\x1b[{row};{col}H{char}")?;
+    }
+    for (pos, _) in self.screen.iter() {
+      if !self.buffer.contains_key(pos) {
+        let col = pos.0;
+        let row = pos.1;
+        write!(self.stdout, "\x1b[{row};{col}H ")?;
+      }
+    }
+    std::mem::swap(&mut self.buffer, &mut self.screen);
+    self.buffer.clear();
     self.stdout.flush()
   }
 
@@ -82,19 +103,4 @@ impl<'a> Terminal<'a> {
     self.stdin.read_exact(&mut b)?;
     Ok(char::from_u32(b[0].into()))
   }
-
-  pub fn char(&mut self, c: char) -> Result<()> {
-    write!(self.stdout, "{c}")
-  }
-
-  pub fn clear(&mut self) -> Result<()> {
-    write!(self.stdout, "\x1b[2J")
-  }
-
-  pub fn go(&mut self, x: i32, y: i32) -> Result<()> {
-    let r = y + 1;
-    let c = x + 1;
-    write!(self.stdout, "\x1b[{r};{c}H")
-  }
 }
-

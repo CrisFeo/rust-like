@@ -24,7 +24,7 @@ impl SpatialMap {
 
   pub fn insert(&mut self, id: Id, coordinate: (i32, i32)) -> Option<(i32, i32)> {
     let previous = self.remove(&id);
-    let previous_coordinate = self.by_id.insert(id, coordinate);
+    self.by_id.insert(id, coordinate);
     if let Some(ids) = self.by_coordinate.get_mut(&coordinate) {
       ids.insert(id);
     } else {
