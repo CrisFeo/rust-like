@@ -10,6 +10,7 @@ use std::io::{
   stdin,
   stdout,
 };
+use crate::grid::Point;
 
 pub struct Terminal<'a> {
   old_termios: libc::termios,
@@ -78,8 +79,8 @@ impl<'a> Terminal<'a> {
     Ok(t)
   }
 
-  pub fn set(&mut self, x: i32, y: i32, c: char) {
-    self.buffer.insert((x + 1, y + 1), c);
+  pub fn set(&mut self, point: Point, c: char) {
+    self.buffer.insert((point.0 + 1, point.1 + 1), c);
   }
 
   pub fn present(&mut self) -> Result<()> {

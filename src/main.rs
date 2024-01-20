@@ -3,6 +3,7 @@ use std::collections::{
   HashMap,
   HashSet,
 };
+use std::rc::Rc;
 use rust_like::*;
 
 #[derive(Debug)]
@@ -64,17 +65,17 @@ impl Action for Turn {
         }
       }
     } else if let Some(ai) = world.ai.get(&id) {
-      if let Some(position) = world.position.get(&id) {
-        let mut position = *position;
-        if let Some(target_position) = world.position.get(&ai.target) {
+      if let Some(&position) = world.position.get(&id) {
+        if let Some(&target_position) = world.position.get(&ai.target) {
           let dx = target_position.0 - position.0;
           let dy = target_position.1 - position.1;
+          let mut position = position;
           if dx.abs() > dy.abs() {
             position.0 += dx.signum();
           } else {
             position.1 += dy.signum();
           }
-          action = if position == *target_position {
+          action = if position == target_position {
             Some(Box::new(Attack(id, position)))
           } else {
             Some(Box::new(Move(id, position)))
@@ -186,15 +187,18 @@ struct World<'a> {
   layer: HashMap<Id, Layer>,
   position: SpatialMap,
   solidity: HashSet<Id>,
+  opacity: HashSet<Id>,
   ai: HashMap<Id, Ai>,
   controls: HashMap<Id, Controls>,
   speed: HashMap<Id, i32>,
   health: HashMap<Id, i32>,
   weapon: HashMap<Id, i32>,
+  fov: FieldOfView,
 }
 
 impl<'a> World<'a> {
   fn new() -> Self {
+    let visibility_cache = Rc::new(VisibilityCache::new(100));
     World {
       time: 0,
       timeline: BinaryHeap::new(),
@@ -205,11 +209,13 @@ impl<'a> World<'a> {
       layer: HashMap::new(),
       position: SpatialMap::new(),
       solidity: HashSet::new(),
+      opacity: HashSet::new(),
       ai: HashMap::new(),
       controls: HashMap::new(),
       speed: HashMap::new(),
       health: HashMap::new(),
       weapon: HashMap::new(),
+      fov: FieldOfView::new(visibility_cache.clone()),
     }
   }
 
@@ -219,6 +225,7 @@ impl<'a> World<'a> {
     self.layer.remove(id);
     self.position.remove(id);
     self.solidity.remove(id);
+    self.opacity.remove(id);
     self.ai.remove(id);
     self.controls.remove(id);
     self.speed.remove(id);
@@ -240,7 +247,35 @@ impl<'a> World<'a> {
       };
       self.time = event.time;
       self.pending_action = Some(event.action);
+      self.update_fov();
     }
+    self.update_fov();
+  }
+
+  fn update_fov(&mut self) {
+    let Some((player_id, _)) = self.controls.iter().next() else {
+      self.fov.update(|p| { false });
+      return;
+    };
+    let Some(player_position) = self.position.get(player_id) else {
+      self.fov.update(|p| { false });
+      return;
+    };
+    self.fov.update(|p| {
+      let position = (player_position.0 + p.0, player_position.1 + p.1);
+      let Some(ids) = self.position.at(position) else {
+        return false;
+      };
+      for id in ids {
+        if id == player_id {
+          return false;
+        }
+        if self.opacity.contains(id) {
+          return true;
+        }
+      }
+      false
+    });
   }
 
   fn draw(&self, t: &mut Terminal) -> std::io::Result<()> {
@@ -248,14 +283,31 @@ impl<'a> World<'a> {
       .iter()
       .collect::<Vec<_>>();
     order.sort_by_key(|l| l.1);
+    let vision_origin = if let Some((player_id, _)) = self.controls.iter().next() {
+      self.position.get(player_id)
+    } else {
+      None
+    };
+
     for (id, _) in order {
-      let icon = or_continue!(
-        self.icon.get(id)
-      );
-      let (x, y) = or_continue!(
+      let position = or_continue!(
         self.position.get(id)
       );
-      t.set(*x, *y, *icon);
+      let is_visible = if let Some(vision_origin) = vision_origin {
+        let position = (position.0 - vision_origin.0, position.1 - vision_origin.1);
+        self.fov.is_visible(position)
+      } else {
+        false
+      };
+      let icon = if is_visible {
+        let Some(icon) = self.icon.get(id) else {
+          continue;
+        };
+        *icon
+      } else {
+        '~'
+      };
+      t.set(*position, icon);
     }
     t.present()
   }
@@ -265,6 +317,7 @@ impl<'a> World<'a> {
 
 fn main() {
   let mut world = World::new();
+
   let player = {
     let id = Id::new();
     world.name.insert(id, "Player");
@@ -284,6 +337,7 @@ fn main() {
     world.timeline.push(Event{time: 0, action: Box::new(Turn(id, None))});
     id
   };
+
   let mut goblin = |p| {
     let id = Id::new();
     world.name.insert(id, "Goblin");
@@ -303,6 +357,7 @@ fn main() {
   _ = goblin((8, 3));
   _ = goblin((9, 2));
   _ = goblin((8, 5));
+
   let size = 20;
   for y in 0..size {
     for x in 0..size {
@@ -315,20 +370,37 @@ fn main() {
         _ => false,
       };
       let id = Id::new();
+      world.position.insert(id, position);
+      world.layer.insert(id, Layer::Map);
       if is_wall {
         world.name.insert(id, "wall");
         world.icon.insert(id, '#');
-        world.layer.insert(id, Layer::Map);
-        world.position.insert(id, position);
         world.solidity.insert(id);
+        world.opacity.insert(id);
       } else {
         world.name.insert(id, "floor");
         world.icon.insert(id, '.');
-        world.layer.insert(id, Layer::Map);
-        world.position.insert(id, position);
       }
     }
   }
+
+  let mut pillar = |p| {
+    let id = Id::new();
+    world.name.insert(id, "pillar");
+    world.icon.insert(id, 'o');
+    world.layer.insert(id, Layer::Mob);
+    world.position.insert(id, p);
+    world.solidity.insert(id);
+    world.opacity.insert(id);
+    id
+  };
+  pillar((5, 5));
+  pillar((5, 6));
+  pillar((5, 7));
+  pillar((4, 7));
+  pillar((4, 9));
+
+  world.update_fov();
 
   let mut t = Terminal::new().unwrap();
   loop {
