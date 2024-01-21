@@ -182,6 +182,7 @@ struct World<'a> {
   timeline: BinaryHeap<Event>,
   pending_action: Option<Box<dyn Action>>,
   input: Option<char>,
+  view_target: Option<Id>,
   name: HashMap<Id, &'a str>,
   icon: HashMap<Id, char>,
   layer: HashMap<Id, Layer>,
@@ -193,17 +194,17 @@ struct World<'a> {
   speed: HashMap<Id, i32>,
   health: HashMap<Id, i32>,
   weapon: HashMap<Id, i32>,
-  fov: FieldOfView,
+  fov: HashMap<Id, FieldOfView>,
 }
 
 impl<'a> World<'a> {
   fn new() -> Self {
-    let visibility_cache = Rc::new(VisibilityCache::new(100));
     World {
       time: 0,
       timeline: BinaryHeap::new(),
       pending_action: None,
       input: None,
+      view_target: None,
       name: HashMap::new(),
       icon: HashMap::new(),
       layer: HashMap::new(),
@@ -215,7 +216,7 @@ impl<'a> World<'a> {
       speed: HashMap::new(),
       health: HashMap::new(),
       weapon: HashMap::new(),
-      fov: FieldOfView::new(visibility_cache.clone()),
+      fov: HashMap::new(),
     }
   }
 
@@ -231,6 +232,7 @@ impl<'a> World<'a> {
     self.speed.remove(id);
     self.health.remove(id);
     self.weapon.remove(id);
+    self.fov.remove(id);
   }
 
   fn update(&mut self, input: char) {
@@ -239,6 +241,7 @@ impl<'a> World<'a> {
       if let Some(mut pending_action) = self.pending_action.take() {
         if !pending_action.run(self) {
           self.pending_action = Some(pending_action);
+          self.update_fov();
           break;
         }
       }
@@ -249,33 +252,30 @@ impl<'a> World<'a> {
       self.pending_action = Some(event.action);
       self.update_fov();
     }
-    self.update_fov();
   }
 
   fn update_fov(&mut self) {
-    let Some((player_id, _)) = self.controls.iter().next() else {
-      self.fov.update(|p| { false });
-      return;
-    };
-    let Some(player_position) = self.position.get(player_id) else {
-      self.fov.update(|p| { false });
-      return;
-    };
-    self.fov.update(|p| {
-      let position = (player_position.0 + p.0, player_position.1 + p.1);
-      let Some(ids) = self.position.at(position) else {
-        return false;
+    for (id, fov) in self.fov.iter_mut() {
+      let Some(position) = self.position.get(id) else {
+        fov.update(|p| { false });
+        return;
       };
-      for id in ids {
-        if id == player_id {
+      fov.update(|p| {
+        let position = (position.0 + p.0, position.1 + p.1);
+        let Some(ids) = self.position.at(position) else {
           return false;
+        };
+        for id_at in ids {
+          if id_at == id {
+            return false;
+          }
+          if self.opacity.contains(id_at) {
+            return true;
+          }
         }
-        if self.opacity.contains(id) {
-          return true;
-        }
-      }
-      false
-    });
+        false
+      });
+    }
   }
 
   fn draw(&self, t: &mut Terminal) -> std::io::Result<()> {
@@ -283,10 +283,10 @@ impl<'a> World<'a> {
       .iter()
       .collect::<Vec<_>>();
     order.sort_by_key(|l| l.1);
-    let vision_origin = if let Some((player_id, _)) = self.controls.iter().next() {
-      self.position.get(player_id)
+    let (vision_origin, vision_fov) = if let Some(id) = self.view_target {
+      (self.position.get(&id), self.fov.get(&id))
     } else {
-      None
+      (None, None)
     };
 
     for (id, _) in order {
@@ -295,9 +295,13 @@ impl<'a> World<'a> {
       );
       let is_visible = if let Some(vision_origin) = vision_origin {
         let position = (position.0 - vision_origin.0, position.1 - vision_origin.1);
-        self.fov.is_visible(position)
+        if let Some(fov) = vision_fov {
+          fov.is_visible(position)
+        } else {
+          true
+        }
       } else {
-        false
+        true
       };
       let icon = if is_visible {
         let Some(icon) = self.icon.get(id) else {
@@ -318,6 +322,8 @@ impl<'a> World<'a> {
 fn main() {
   let mut world = World::new();
 
+  let visibility_cache = Rc::new(VisibilityCache::new(100));
+
   let player = {
     let id = Id::new();
     world.name.insert(id, "Player");
@@ -334,9 +340,11 @@ fn main() {
     world.health.insert(id, 3);
     world.weapon.insert(id, 1);
     world.speed.insert(id, 5);
+    world.fov.insert(id, FieldOfView::new(visibility_cache.clone()));
     world.timeline.push(Event{time: 0, action: Box::new(Turn(id, None))});
     id
   };
+  world.view_target = Some(player);
 
   let mut goblin = |p| {
     let id = Id::new();
