@@ -6,6 +6,13 @@ pub struct SpatialMap {
   by_coordinate: HashMap<(i32, i32), HashSet<Id>>,
 }
 
+impl Default for SpatialMap {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+
 impl SpatialMap {
   pub fn new() -> Self {
     Self {

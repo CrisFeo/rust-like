@@ -18,6 +18,12 @@ pub struct Id(usize);
 static NEXT_ID: AtomicUsize =
   AtomicUsize::new(0);
 
+impl Default for Id {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl Id {
   pub fn new() -> Self {
     let id = NEXT_ID.fetch_add(
