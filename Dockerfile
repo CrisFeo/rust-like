@@ -12,6 +12,7 @@ RUN echo "$USER ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN echo 'http://dl-cdn.alpinelinux.org/alpine/edge/community/' >> /etc/apk/repositories
 RUN apk add --no-cache \
   bash                 \
+  less                 \
   openssh              \
   git                  \
   just                 \
@@ -20,4 +21,5 @@ RUN apk add --no-cache \
 
 USER $USER
 RUN /usr/bin/rustup-init -y
+RUN $HOME/.cargo/bin/cargo install bacon
 RUN echo '. $HOME/.cargo/env' > $HOME/.bashrc

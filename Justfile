@@ -1,11 +1,15 @@
 list:
   just -l -u
 
-build:
-  cargo build
+watch:
+  bacon clippy
+
+dev:
+  just run || :
+  just logs
 
 run:
-  cargo run
+  RUST_BACKTRACE=1 cargo run --color always 2> logs.txt
 
-check:
-  cargo clippy
+logs:
+  less -R logs.txt

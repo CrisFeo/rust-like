@@ -1,26 +1,13 @@
-use std::collections::{HashMap, HashSet};
 use crate::id::Id;
+use std::collections::{HashMap, HashSet};
 
+#[derive(Default)]
 pub struct SpatialMap {
   by_id: HashMap<Id, (i32, i32)>,
   by_coordinate: HashMap<(i32, i32), HashSet<Id>>,
 }
 
-impl Default for SpatialMap {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-
 impl SpatialMap {
-  pub fn new() -> Self {
-    Self {
-      by_id: HashMap::new(),
-      by_coordinate: HashMap::new(),
-    }
-  }
-
   pub fn get(&self, id: &Id) -> Option<&(i32, i32)> {
     self.by_id.get(id)
   }

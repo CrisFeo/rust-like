@@ -1,14 +1,11 @@
+use crate::grid::{line, Point};
 use std::collections::HashMap;
-use crate::grid::{
-  Point,
-  line,
-};
 use std::rc::Rc;
 
 #[derive(Debug)]
 struct Node {
   point: Point,
-  children: Vec<usize>
+  children: Vec<usize>,
 }
 
 pub struct VisibilityCache {
@@ -45,7 +42,8 @@ impl VisibilityCache {
         continue;
       }
       let mut next = None;
-      self.paths
+      self
+        .paths
         .entry(point)
         .and_modify(|tos| tos.push(destination))
         .or_insert_with(|| vec![destination]);
@@ -81,7 +79,12 @@ impl VisibilityCache {
   }
 
   fn add_child(&mut self, index: usize, child_index: usize) {
-    self.nodes.get_mut(index).unwrap().children.push(child_index)
+    self
+      .nodes
+      .get_mut(index)
+      .unwrap()
+      .children
+      .push(child_index)
   }
 }
 
@@ -100,22 +103,22 @@ impl FieldOfView {
     }
   }
 
-  pub fn update<F>(&mut self, check_opaque: F) where F: Fn(Point) -> bool {
+  pub fn update<F>(&mut self, check_opaque: F)
+  where
+    F: Fn(Point) -> bool,
+  {
     self.generation += 1;
     let quadrant_transforms = [
-      |p: Point| { ( p.0,  p.1) },
-      |p: Point| { (-p.1,  p.0) },
-      |p: Point| { (-p.0, -p.1) },
-      |p: Point| { ( p.1, -p.0) },
+      |p: Point| (p.0, p.1),
+      |p: Point| (-p.1, p.0),
+      |p: Point| (-p.0, -p.1),
+      |p: Point| (p.1, -p.0),
     ];
     let mut pending = Vec::new();
     for to_quadrant in quadrant_transforms {
       pending.clear();
       pending.push(0);
-      loop {
-        let Some(current) = pending.pop() else {
-          break;
-        };
+      while let Some(current) = pending.pop() {
         let node = self.cache.get_node(current);
         let point = to_quadrant(node.point);
         if !check_opaque(point) {
@@ -134,5 +137,4 @@ impl FieldOfView {
     };
     *generation == self.generation
   }
-
 }

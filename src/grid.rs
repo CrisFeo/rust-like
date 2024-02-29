@@ -10,7 +10,7 @@ pub struct LineIter {
 
 impl Iterator for LineIter {
   type Item = Point;
-  
+
   fn next(&mut self) -> Option<Self::Item> {
     if self.remaining_steps < 0 {
       return None;
@@ -62,16 +62,13 @@ pub struct SpiralIter {
 
 impl Iterator for SpiralIter {
   type Item = Point;
-  
+
   fn next(&mut self) -> Option<Self::Item> {
     if self.remaining_steps == 0 {
       return None;
     }
     let result = self.next;
-    self.next = (
-      self.next.0 + self.step.0,
-      self.next.1 + self.step.1
-    );
+    self.next = (self.next.0 + self.step.0, self.next.1 + self.step.1);
     self.remaining_steps -= 1;
     self.steps_taken_on_side += 1;
     if self.steps_taken_on_side == self.steps_to_take_on_side {

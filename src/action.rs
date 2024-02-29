@@ -19,11 +19,11 @@ impl Action for Turn {
     let id = self.0;
     let mut action: Option<Box<dyn Action>> = None;
     if let Some(controls) = world.controls.get(&id) {
-      let direction = match world.input.take() {
-        Some(i) if i == controls.up =>    ( 0, -1),
-        Some(i) if i == controls.down =>  ( 0,  1),
-        Some(i) if i == controls.left =>  (-1,  0),
-        Some(i) if i == controls.right => ( 1,  0),
+      let direction = match world.input.take_or_request() {
+        Some(i) if i == controls.up => (0, -1),
+        Some(i) if i == controls.down => (0, 1),
+        Some(i) if i == controls.left => (-1, 0),
+        Some(i) if i == controls.right => (1, 0),
         _ => return false,
       };
       if let Some(position) = world.position.get(&id) {
@@ -62,10 +62,10 @@ impl Action for Turn {
       Some(speed) => *speed,
       None => 10,
     };
-    world.timeline.push(Event {
-      time: world.time + speed as usize,
-      action: Box::new(Self(id, action)),
-    });
+    world.timeline.push(
+      world.time + speed as usize,
+      Box::new(Self(id, action)),
+    );
     true
   }
 }

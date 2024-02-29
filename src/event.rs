@@ -1,28 +1,13 @@
-use std::cmp::Ordering;
-use crate::action::Action;
+use crate::*;
 
-pub struct Event {
-  pub time: usize,
-  pub action: Box<dyn Action>,
+#[derive(Debug)]
+pub enum Event {
+  Turn(Id),
+  Action(Id, Action),
 }
 
-impl Eq for Event { }
-
-impl PartialEq for Event {
-  fn eq(&self, other: &Self) -> bool {
-    self.time == other.time
-  }
+#[derive(Debug)]
+pub enum Action {
+  Move((i32, i32)),
+  Attack((i32, i32)),
 }
-
-impl Ord for Event {
-  fn cmp(&self, other: &Self) -> Ordering {
-    other.time.cmp(&self.time)
-  }
-}
-
-impl PartialOrd for Event {
-  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    Some(other.time.cmp(&self.time))
-  }
-}
-
