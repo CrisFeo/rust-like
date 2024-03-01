@@ -325,11 +325,11 @@ impl<'a> WidgetTree<'a> {
   }
 
   fn get_multi_child_ids(&self, id: Id) -> Vec<Id> {
-    let children = self
+    self
       .children
       .get(&id)
-      .expect("multi-child widget had no children");
-    children.clone()
+      .cloned()
+      .unwrap_or_else(Vec::new)
   }
 
   fn render_widget(&self, terminal: &mut Terminal, parent_position: Position, id: Id) {

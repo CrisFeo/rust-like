@@ -33,11 +33,11 @@ fn main() {
     id
   };
 
-  let mut goblin = |p| {
+  let mut goblin = |i, p| {
     let id = Id::new();
     world.exists.insert(id);
     world.name.insert(id, "Goblin");
-    world.icon.insert(id, 'G');
+    world.icon.insert(id, i);
     world.layer.insert(id, Layer::Mob);
     world.position.insert(id, p);
     world.solidity.insert(id);
@@ -48,9 +48,9 @@ fn main() {
     world.timeline.push(0, Event::Turn(id));
     id
   };
-  _ = goblin((8, 3));
-  _ = goblin((9, 2));
-  _ = goblin((8, 5));
+  _ = goblin('G', (8, 3));
+  _ = goblin('N', (9, 2));
+  _ = goblin('T', (8, 5));
 
   let size = 20;
   for y in 0..size {

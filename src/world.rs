@@ -133,13 +133,17 @@ impl World {
       return;
     }
     match action {
-      Action::Move(position) => self.update_move(id, position),
-      Action::Attack(position) => self.update_attack(id, position),
+      Action::Move(vector) => self.update_move(id, vector),
+      Action::Attack(vector) => self.update_attack(id, vector),
     }
     self.current_event = Some(Event::Turn(id));
   }
 
-  fn update_move(&mut self, id: Id, position: (i32, i32)) {
+  fn update_move(&mut self, id: Id, vector: (i32, i32)) {
+    let Some(position) = self.position.get(&id) else {
+      return;
+    };
+    let position = (position.0 + vector.0, position.1 + vector.1);
     let mut is_blocked = false;
     if let Some(ids) = self.position.at(position) {
       for target_id in ids.iter() {
@@ -157,7 +161,11 @@ impl World {
     }
   }
 
-  fn update_attack(&mut self, id: Id, position: (i32, i32)) {
+  fn update_attack(&mut self, id: Id, vector: (i32, i32)) {
+    let Some(position) = self.position.get(&id) else {
+      return;
+    };
+    let position = (position.0 + vector.0, position.1 + vector.1);
     let Some(weapon) = self.weapon.get(&id) else {
       return;
     };
@@ -242,11 +250,11 @@ impl World {
       return true;
     };
     let position = (position.0 + direction.0, position.1 + direction.1);
-    let mut action = Action::Move(position);
+    let mut action = Action::Move(direction);
     if let Some(ids) = self.position.at(position) {
       for target_id in ids.iter() {
         if self.solidity.contains(target_id) {
-          action = Action::Attack(position);
+          action = Action::Attack(direction);
           break;
         }
       }
@@ -268,20 +276,20 @@ impl World {
     let Some(target_position) = self.position.get(&ai.target) else {
       return true;
     };
-    let mut desired_position = *position;
     let target_vector = (
       target_position.0 - position.0,
       target_position.1 - position.1,
     );
-    if target_vector.0.abs() > target_vector.1.abs() {
-      desired_position.0 += target_vector.0.signum();
+    let vector = if target_vector.0.abs() > target_vector.1.abs() {
+      (target_vector.0.signum(), 0)
     } else {
-      desired_position.1 += target_vector.1.signum();
-    }
+      (0, target_vector.1.signum())
+    };
+    let desired_position = (position.0 + vector.0, position.1 + vector.1);
     let action = if desired_position == *target_position {
-      Action::Attack(desired_position)
+      Action::Attack(vector)
     } else {
-      Action::Move(desired_position)
+      Action::Move(vector)
     };
     self.timeline.push(self.time + *speed as usize, Event::Action(id, action));
     true
@@ -312,7 +320,7 @@ impl World {
   }
 
   fn update_ui(&mut self) {
-    let stats = {
+    let player_stats = {
       let target_id = self.view_target;
       fn stat(name: &'static str, value: Option<impl fmt::Display>) -> WidgetFn<'static> {
         let value = value.map(|v| v.to_string()).unwrap_or_else(|| "-".into());
@@ -328,36 +336,49 @@ impl World {
         stat("Speed:", self.speed.get(&target_id)),
       ])
     };
+    let world_stats = {
+      column(vec![
+        row(vec![
+            text("Time:"),
+            flex(expand_width(text(" "))),
+            text(self.time.to_string()),
+        ]),
+      ])
+    };
     let timeline = {
       let format_event = |time: usize, event: &Event| {
-        match event {
+        let (icon, description) = match event {
           Event::Turn(id) => {
             let Some(icon) = self.icon.get(id) else {
               return None;
             };
-            Some((time.to_string(), icon.to_string(), "turn".to_string()))
+            (icon, "turn".to_string())
           },
           Event::Action(id, action) => {
             let Some(icon) = self.icon.get(id) else {
               return None;
             };
             let description = match action {
-              Action::Move(_) => "move",
-              Action::Attack(_) => "attack",
+              Action::Move(v) => format!("move {},{}", v.0, v.1),
+              Action::Attack(v) => format!("attack {},{}", v.0, v.1),
             };
-            Some((time.to_string(), icon.to_string(), description.to_string()))
+            (icon, description)
           },
-        }
+        };
+        let time = time - self.time;
+        Some((time.to_string(), icon.to_string(), description))
       };
-      let events = self.current_event
-        .iter()
-        .filter_map(|event| format_event(self.time, event))
-        .chain(
-          self.timeline
-            .iter()
-            .filter_map(|(time, event)| format_event(time, event))
-        );
+      let current_event = match &self.current_event {
+        Some(event) => format_event(self.time, event),
+        None => None,
+      };
+      let mut events = vec![current_event];
+      for (time, event) in self.timeline.iter() {
+        events.push(format_event(time, event))
+      }
       let entries = events
+        .into_iter()
+        .flatten()
         .map(|e| {
           row(vec![
             text(e.0),
@@ -368,13 +389,10 @@ impl World {
           ])
         })
         .collect::<Vec<_>>();
-      padding(
-        (0, 0, 1, 0),
-        column(vec![
-          text("Timeline:"),
-          column(entries),
-        ]),
-      )
+      column(vec![
+        text("Events:"),
+        column(entries),
+      ])
     };
     fn border(width: (i32, i32, i32, i32), child: WidgetFn) -> WidgetFn {
       fill(
@@ -397,7 +415,10 @@ impl World {
         fixed_width(
           20,
           column(vec![
-            stats,
+            player_stats,
+            text(" "),
+            world_stats,
+            text(" "),
             expand_height(timeline),
           ]),
         ),
