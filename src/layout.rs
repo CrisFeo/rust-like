@@ -348,7 +348,13 @@ impl<'a> WidgetTree<'a> {
       .geometry
       .get(&id)
       .expect("widget should have a geometry during render");
-    log!("[LAYOUT] rendering widget", id, widget, position, geometry);
+    log!(
+      "[LAYOUT] rendering widget",
+      id,
+      widget,
+      position,
+      geometry,
+    );
     match widget {
       Widget::Fill(char) => {
         for column in 0..geometry.width {

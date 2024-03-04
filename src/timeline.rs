@@ -19,7 +19,7 @@ impl<T> Timeline<T> {
     self.0.pop().map(|s| (s.0, s.1))
   }
 
-  pub fn iter(&mut self) -> impl Iterator<Item = (usize, &T)> + '_ {
+  pub fn iter(&self) -> impl Iterator<Item = (usize, &T)> + '_ {
     self.0.iter().map(|s| (s.0, &s.1))
   }
 }
