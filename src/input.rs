@@ -24,9 +24,8 @@ impl Input {
           unreachable!()
         };
         Some(char)
-      },
+      }
       Self::Requested => None,
     }
   }
 }
-

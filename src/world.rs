@@ -1,7 +1,6 @@
 use crate::*;
-use std::io;
 use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet};
+use std::io;
 
 #[derive(Debug)]
 pub struct Controls {
@@ -9,6 +8,7 @@ pub struct Controls {
   pub down: char,
   pub left: char,
   pub right: char,
+  pub wait: char,
 }
 
 #[derive(Debug)]
@@ -27,23 +27,24 @@ pub struct World {
   pub input: Input,
   pub ui: WidgetTree<'static>,
   pub viewport_id: Id,
+  pub tick: usize,
   pub time: usize,
   pub timeline: Timeline<Event>,
   pub current_event: Option<Event>,
   pub view_target: Id,
-  pub exists: HashSet<Id>,
-  pub name: HashMap<Id, &'static str>,
-  pub icon: HashMap<Id, char>,
-  pub layer: HashMap<Id, Layer>,
-  pub position: SpatialMap,
-  pub solidity: HashSet<Id>,
-  pub opacity: HashSet<Id>,
-  pub controls: HashMap<Id, Controls>,
-  pub ai: HashMap<Id, Ai>,
-  pub speed: HashMap<Id, i32>,
-  pub health: HashMap<Id, i32>,
-  pub weapon: HashMap<Id, i32>,
-  pub fov: HashMap<Id, FieldOfView>,
+  pub exists: Is<Id>,
+  pub name: HasOne<Id, &'static str>,
+  pub icon: HasOne<Id, char>,
+  pub layer: HasOne<Id, Layer>,
+  pub position: ManyToOne<Id, (i32, i32)>,
+  pub solidity: Is<Id>,
+  pub opacity: Is<Id>,
+  pub controls: HasOne<Id, Controls>,
+  pub ai: HasOne<Id, Ai>,
+  pub health: HasOne<Id, i32>,
+  pub fov: HasOne<Id, FieldOfView>,
+  pub held_by: ManyToOne<Id, Id>,
+  pub provides_activity: HasMany<Id, Activity>,
 }
 
 impl World {
@@ -52,15 +53,16 @@ impl World {
     self.name.remove(id);
     self.icon.remove(id);
     self.layer.remove(id);
-    self.position.remove(id);
+    self.position.remove_by_left(id);
     self.solidity.remove(id);
     self.opacity.remove(id);
     self.controls.remove(id);
     self.ai.remove(id);
-    self.speed.remove(id);
     self.health.remove(id);
-    self.weapon.remove(id);
     self.fov.remove(id);
+    self.held_by.remove_by_left(id);
+    self.held_by.remove_by_right(id);
+    self.provides_activity.remove_by_left(id);
   }
 
   pub fn startup(&mut self) {
@@ -71,19 +73,19 @@ impl World {
   pub fn update(&mut self, input: char) {
     self.input = Input::Some(input);
     loop {
-      update_current_event(self);
+      update_timeline(self);
       if self.current_event.is_none() {
         break;
       }
       log!(
-        "[EVENT] processing current event",
+        "EVENT",
+        "processing current event",
         self.time,
         self.input,
         self.current_event,
       );
-      update_action_event(self);
+      update_current_event(self);
       update_dead_entities(self);
-      update_turn_event(self);
       update_fov(self);
       if self.input.is_requested() {
         break;
@@ -97,14 +99,17 @@ impl World {
     if self.ui.layout(dimensions) {
       let viewport_position = self.ui.get_global_position(self.viewport_id).unwrap();
       let viewport_geometry = self.ui.get_geometry(self.viewport_id).unwrap();
-      self.render_viewport(terminal, viewport_position, viewport_geometry);
-      self.ui.render(terminal);
+      self.draw_viewport(terminal, viewport_position, viewport_geometry);
+      self.ui.draw(terminal);
     }
     terminal.present()
   }
 
-  fn render_viewport(&self, terminal: &mut Terminal, offset: (i32, i32), size: (i32, i32)) {
-    let target = self.position.get(&self.view_target).unwrap_or(&(0, 0));
+  fn draw_viewport(&self, terminal: &mut Terminal, offset: (i32, i32), size: (i32, i32)) {
+    let target = self
+      .position
+      .get_right(&self.view_target)
+      .unwrap_or(&(0, 0));
     let to_screen = ((-size.0 / 2) + target.0, (-size.1 / 2) + target.1);
     for column in 0..size.0 {
       for row in 0..size.1 {
@@ -114,7 +119,7 @@ impl World {
           let vision = (world.0 - target.0, world.1 - target.1);
           is_visible = fov.is_visible(vision);
         }
-        let char = match self.position.at(world) {
+        let char = match self.position.get_lefts(&world) {
           None => ' ',
           Some(ids) => {
             if is_visible {
@@ -133,7 +138,7 @@ impl World {
   }
 }
 
-fn update_current_event(world: &mut World) {
+fn update_timeline(world: &mut World) {
   if world.current_event.is_some() {
     return;
   }
@@ -145,7 +150,8 @@ fn update_current_event(world: &mut World) {
 }
 
 fn update_dead_entities(world: &mut World) {
-  let ids = world.health
+  let ids = world
+    .health
     .iter()
     .filter(|(_, health)| **health <= 0)
     .map(|(id, _)| *id)
@@ -160,7 +166,7 @@ fn update_dead_view_target(world: &mut World, id: Id) {
   if id != world.view_target {
     return;
   }
-  let Some(position) = world.position.get(&id) else {
+  let Some(position) = world.position.get_right(&id) else {
     return;
   };
   let id = Id::new();
@@ -170,13 +176,13 @@ fn update_dead_view_target(world: &mut World, id: Id) {
 
 fn update_fov(world: &mut World) {
   for (id, fov) in world.fov.iter_mut() {
-    let Some(position) = world.position.get(id) else {
+    let Some(position) = world.position.get_right(id) else {
       fov.update(|_| false);
       return;
     };
     fov.update(|p| {
       let position = (position.0 + p.0, position.1 + p.1);
-      let Some(ids) = world.position.at(position) else {
+      let Some(ids) = world.position.get_lefts(&position) else {
         return false;
       };
       for id_at in ids {

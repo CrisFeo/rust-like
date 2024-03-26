@@ -3,23 +3,23 @@ use crate::*;
 #[derive(Debug)]
 pub enum Action {
   Move((i32, i32)),
-  Attack((i32, i32)),
+  Attack((i32, i32), i32),
 }
 
-pub fn update_action(world: &mut World, action: Action, id: Id) {
+pub fn update_action(world: &mut World, id: Id, action: Action) {
   match action {
     Action::Move(vector) => update_move(world, id, vector),
-    Action::Attack(vector) => update_attack(world, id, vector),
+    Action::Attack(vector, damage) => update_attack(world, id, vector, damage),
   }
 }
 
 fn update_move(world: &mut World, id: Id, vector: (i32, i32)) {
-  let Some(position) = world.position.get(&id) else {
+  let Some(position) = world.position.get_right(&id) else {
     return;
   };
   let position = (position.0 + vector.0, position.1 + vector.1);
   let mut is_blocked = false;
-  if let Some(ids) = world.position.at(position) {
+  if let Some(ids) = world.position.get_lefts(&position) {
     for target_id in ids.iter() {
       if *target_id == id {
         continue;
@@ -35,15 +35,12 @@ fn update_move(world: &mut World, id: Id, vector: (i32, i32)) {
   }
 }
 
-fn update_attack(world: &mut World, id: Id, vector: (i32, i32)) {
-  let Some(position) = world.position.get(&id) else {
+fn update_attack(world: &mut World, id: Id, vector: (i32, i32), damage: i32) {
+  let Some(position) = world.position.get_right(&id) else {
     return;
   };
   let position = (position.0 + vector.0, position.1 + vector.1);
-  let Some(weapon) = world.weapon.get(&id) else {
-    return;
-  };
-  let Some(ids) = world.position.at(position) else {
+  let Some(ids) = world.position.get_lefts(&position) else {
     return;
   };
   let mut target_id = None;
@@ -56,9 +53,8 @@ fn update_attack(world: &mut World, id: Id, vector: (i32, i32)) {
   let Some(target_id) = target_id else {
     return;
   };
-  let Some(health) = world.health.get_mut(&target_id) else {
+  let Some(health) = world.health.get(&target_id) else {
     return;
   };
-  *health = (*health - *weapon).max(0);
+  world.health.insert(target_id, (*health - damage).max(0));
 }
-

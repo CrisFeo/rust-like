@@ -4,6 +4,9 @@ list:
 watch:
   bacon clippy
 
+fmt:
+  cargo fmt
+
 dev:
   just run || :
   just logs

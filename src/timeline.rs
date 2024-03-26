@@ -1,5 +1,5 @@
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 pub struct Timeline<T>(BinaryHeap<Scheduled<T>>);
 
@@ -10,7 +10,6 @@ impl<T> Default for Timeline<T> {
 }
 
 impl<T> Timeline<T> {
-
   pub fn push(&mut self, time: usize, item: T) {
     self.0.push(Scheduled(time, item))
   }

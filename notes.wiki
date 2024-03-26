@@ -1,0 +1,21 @@
+
+
+
+
+
+# item
+
+- provides "actions" that can be used by a mob
+-- mobs must be holding item in some manner
+- has optional item stats relevant to provided actions
+-- durability
+-- damage
+- has zero or more "components"  that it is built of
+-- these are other items
+
+```
+held: ManyToOne<Id, Id>
+held_action: HashMap<Id, HashSet<ActionType>>
+health: HashMap<Id, i32>
+components: ManyToOne<Id, Id>
+```

@@ -21,15 +21,37 @@ fn main() {
         down: 'j',
         left: 'h',
         right: 'l',
+        wait: ' ',
       },
     );
     world.health.insert(id, 3);
-    world.weapon.insert(id, 1);
-    world.speed.insert(id, 5);
     world
       .fov
       .insert(id, FieldOfView::new(visibility_cache.clone()));
-    world.timeline.push(0, Event::Turn(id));
+    world.timeline.push(0, Event::Turn(id, Turn::Player));
+    world.provides_activity.insert(
+      id,
+      Activity {
+        speed: 5,
+        activity_type: ActivityType::Step(),
+      },
+    );
+    let sword = {
+      let id = Id::new();
+      world.exists.insert(id);
+      world.name.insert(id, "Arming Sword");
+      world.icon.insert(id, '/');
+      world.layer.insert(id, Layer::Mob);
+      world.provides_activity.insert(
+        id,
+        Activity {
+          speed: 5,
+          activity_type: ActivityType::MeleeAttack(1),
+        },
+      );
+      id
+    };
+    world.held_by.insert(sword, id);
     id
   };
 
@@ -43,9 +65,32 @@ fn main() {
     world.solidity.insert(id);
     world.ai.insert(id, Ai { target: player });
     world.health.insert(id, 1);
-    world.weapon.insert(id, 1);
-    world.speed.insert(id, 10);
-    world.timeline.push(0, Event::Turn(id));
+    world
+      .timeline
+      .push(0, Event::Turn(id, Turn::Ai(Some(Action::Move((0, 0))))));
+    world.provides_activity.insert(
+      id,
+      Activity {
+        speed: 10,
+        activity_type: ActivityType::Step(),
+      },
+    );
+    let club = {
+      let id = Id::new();
+      world.exists.insert(id);
+      world.name.insert(id, "Crude Club");
+      world.icon.insert(id, '!');
+      world.layer.insert(id, Layer::Mob);
+      world.provides_activity.insert(
+        id,
+        Activity {
+          speed: 10,
+          activity_type: ActivityType::MeleeAttack(1),
+        },
+      );
+      id
+    };
+    world.held_by.insert(club, id);
     id
   };
   _ = goblin('G', (8, 3));
@@ -103,7 +148,9 @@ fn main() {
     world.draw(&mut t).unwrap();
     use terminal::Event::*;
     match t.poll() {
-      Resize() => {}
+      Tick(_) => {
+        world.tick += 1;
+      }
       Input(char) => {
         if char == 'q' {
           break;

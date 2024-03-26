@@ -77,9 +77,9 @@ impl<'a> WidgetTree<'a> {
     true
   }
 
-  pub fn render(&mut self, terminal: &mut Terminal) {
-    let root_id = self.root_id.expect("root id should be set during render");
-    self.render_widget(terminal, Position(0, 0), root_id);
+  pub fn draw(&mut self, terminal: &mut Terminal) {
+    let root_id = self.root_id.expect("root id should be set during draw");
+    self.draw_widget(terminal, Position(0, 0), root_id);
   }
 
   pub fn get_global_position(&self, id: Id) -> Option<(i32, i32)> {
@@ -325,36 +325,26 @@ impl<'a> WidgetTree<'a> {
   }
 
   fn get_multi_child_ids(&self, id: Id) -> Vec<Id> {
-    self
-      .children
-      .get(&id)
-      .cloned()
-      .unwrap_or_else(Vec::new)
+    self.children.get(&id).cloned().unwrap_or_else(Vec::new)
   }
 
-  fn render_widget(&self, terminal: &mut Terminal, parent_position: Position, id: Id) {
+  fn draw_widget(&self, terminal: &mut Terminal, parent_position: Position, id: Id) {
     let position = {
       let p = self
         .position
         .get(&id)
-        .expect("widget with id should have a position during render");
+        .expect("widget with id should have a position during draw");
       Position(p.0 + parent_position.0, p.1 + parent_position.1)
     };
     let widget = self
       .widget
       .get(&id)
-      .expect("widget with id should exist during render");
+      .expect("widget with id should exist during draw");
     let geometry = self
       .geometry
       .get(&id)
-      .expect("widget should have a geometry during render");
-    log!(
-      "[LAYOUT] rendering widget",
-      id,
-      widget,
-      position,
-      geometry,
-    );
+      .expect("widget should have a geometry during draw");
+    log!("LAYOUT", "drawing widget", id, widget, position, geometry);
     match widget {
       Widget::Fill(char) => {
         for column in 0..geometry.width {
@@ -362,16 +352,16 @@ impl<'a> WidgetTree<'a> {
             terminal.set((position.0 + column, position.1 + row), *char);
           }
         }
-        self.render_child(terminal, position, id);
+        self.draw_child(terminal, position, id);
       }
-      Widget::Padding(_, _, _, _) => self.render_child(terminal, position, id),
-      Widget::ExpandWidth() => self.render_child(terminal, position, id),
-      Widget::ExpandHeight() => self.render_child(terminal, position, id),
-      Widget::FixedWidth(_) => self.render_child(terminal, position, id),
-      Widget::FixedHeight(_) => self.render_child(terminal, position, id),
-      Widget::Row() => self.render_children(terminal, position, id),
-      Widget::Column() => self.render_children(terminal, position, id),
-      Widget::Flex() => self.render_child(terminal, position, id),
+      Widget::Padding(_, _, _, _) => self.draw_child(terminal, position, id),
+      Widget::ExpandWidth() => self.draw_child(terminal, position, id),
+      Widget::ExpandHeight() => self.draw_child(terminal, position, id),
+      Widget::FixedWidth(_) => self.draw_child(terminal, position, id),
+      Widget::FixedHeight(_) => self.draw_child(terminal, position, id),
+      Widget::Row() => self.draw_children(terminal, position, id),
+      Widget::Column() => self.draw_children(terminal, position, id),
+      Widget::Flex() => self.draw_child(terminal, position, id),
       Widget::Text(value) => {
         let mut chars = value.chars();
         for row in 0..geometry.height {
@@ -385,15 +375,15 @@ impl<'a> WidgetTree<'a> {
     };
   }
 
-  fn render_child(&self, terminal: &mut Terminal, position: Position, id: Id) {
+  fn draw_child(&self, terminal: &mut Terminal, position: Position, id: Id) {
     let child_id = *self.get_single_child_id(id);
-    self.render_widget(terminal, position, child_id);
+    self.draw_widget(terminal, position, child_id);
   }
 
-  fn render_children(&self, terminal: &mut Terminal, position: Position, id: Id) {
+  fn draw_children(&self, terminal: &mut Terminal, position: Position, id: Id) {
     let children = self.get_multi_child_ids(id);
     for child_id in children.iter() {
-      self.render_widget(terminal, position, *child_id);
+      self.draw_widget(terminal, position, *child_id);
     }
   }
 }

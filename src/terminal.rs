@@ -4,10 +4,11 @@ use std::io::{stdin, stdout, BufWriter, Error, Read, Result, StdoutLock, Write};
 use std::mem;
 use std::sync::mpsc;
 use std::thread;
+use std::time;
 
 pub enum Event {
   Input(char),
-  Resize(),
+  Tick(time::Instant),
 }
 
 pub struct Terminal<'a> {
@@ -50,29 +51,8 @@ impl<'a> Terminal<'a> {
       old_termios
     };
     let (event_sender, event_receiver) = mpsc::channel();
-    let input_event_sender = event_sender.clone();
-    thread::spawn(move || {
-      let mut b = [0u8];
-      let mut stdin = stdin().lock();
-      loop {
-        stdin
-          .read_exact(&mut b)
-          .expect("reading one byte from input should not fail");
-        let char = char::from_u32(b[0].into());
-        if let Some(char) = char {
-          input_event_sender
-            .send(Event::Input(char))
-            .expect("sending input event should not fail");
-        }
-      }
-    });
-    /*
-    // TODO implement WINCH signal handling
-    unsafe {
-      let mut fds = [0, 0];
-      let pipe = libc::pipe(&mut fds);
-    }
-    */
+    set_up_input_event(event_sender.clone());
+    set_up_tick_event(event_sender);
     let stdout = BufWriter::new(stdout().lock());
     let mut t = Terminal {
       old_termios,
@@ -130,4 +110,35 @@ impl<'a> Terminal<'a> {
   pub fn poll(&mut self) -> Event {
     self.event_receiver.recv().unwrap()
   }
+}
+
+fn set_up_input_event(event_sender: mpsc::Sender<Event>) {
+  thread::spawn(move || {
+    let mut b = [0u8];
+    let mut stdin = stdin().lock();
+    loop {
+      stdin
+        .read_exact(&mut b)
+        .expect("reading one byte from input should not fail");
+      let char = char::from_u32(b[0].into());
+      if let Some(char) = char {
+        event_sender
+          .send(Event::Input(char))
+          .expect("sending input event should not fail");
+      }
+    }
+  });
+}
+
+fn set_up_tick_event(event_sender: mpsc::Sender<Event>) {
+  thread::spawn(move || {
+    let delay = time::Duration::from_millis(50);
+    loop {
+      thread::sleep(delay);
+      let now = time::Instant::now();
+      event_sender
+        .send(Event::Tick(now))
+        .expect("sending tick event should not fail");
+    }
+  });
 }
