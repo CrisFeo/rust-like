@@ -16,7 +16,8 @@ pub fn update_ui(world: &mut World) {
         ]),
       ),
     ),
-    expand_height(expand_width(viewport(world.viewport_id))),
+    flex(expand_width(expand_height(viewport(world.viewport_id)))),
+    turn_controls(world),
   ]);
   world.ui.update(ui);
 }
@@ -55,12 +56,10 @@ fn timeline(world: &World) -> WidgetFn<'static> {
   let format_event = |time: usize, event: &Event| {
     let (icon, description) = match event {
       Event::Turn(id, turn) => {
-        let Some(icon) = world.icon.get(id) else {
-          return None;
-        };
+        let icon = world.icon.get(id)?;
         let description = match turn {
-          Turn::Player => "turn".to_string(),
-          Turn::Ai(action) => format_action_description(action),
+          TurnType::Player(_) => "turn".to_string(),
+          TurnType::Ai(ai) => format_action_description(&ai.pending_action),
         };
         (icon, description)
       } //      Event::Action(id, action) => {
@@ -88,6 +87,39 @@ fn timeline(world: &World) -> WidgetFn<'static> {
     .map(|e| row(vec![text(e.0), text(" "), text(e.1), text(" "), text(e.2)]))
     .collect::<Vec<_>>();
   column(vec![text("Events:"), column(entries)])
+}
+
+fn turn_controls(world: &World) -> WidgetFn<'static> {
+  let Some(current_event) = &world.current_event else {
+    return column(vec![]);
+  };
+  let Event::Turn(id, TurnType::Player(turn)) = current_event else {
+    return column(vec![]);
+  };
+  let activities = collect_activities(world, *id)
+    .enumerate()
+    .map(|(i, (id, activity))| {
+      let from_name = world.name.get(&id).unwrap_or(&"???");
+      let selector = if i == turn.selected_activity_index {
+        text("> ")
+      } else {
+        text("  ")
+      };
+      row(vec![
+        selector,
+        text(activity.name.to_string()),
+        text(format!(" {}t", activity.speed)),
+        text(format!(" ({from_name})")),
+      ])
+    })
+    .collect();
+  border(
+    (1, 0, 0, 0),
+    column(vec![
+      text("Activities:"),
+      column(activities),
+    ])
+  )
 }
 
 fn format_action_description(action: &Option<Action>) -> String {

@@ -2,8 +2,7 @@ use crate::*;
 
 #[derive(Debug)]
 pub enum Event {
-  //Action(Id, Action),
-  Turn(Id, Turn),
+  Turn(Id, TurnType),
 }
 
 pub fn update_current_event(world: &mut World) {
@@ -11,7 +10,6 @@ pub fn update_current_event(world: &mut World) {
     return;
   };
   match current_event {
-    //Event::Action(id, action) => update_action(world, id, action),
-    Event::Turn(id, turn) => update_turn(world, id, turn),
+    Event::Turn(id, turn) => turn.update(world, id),
   };
 }

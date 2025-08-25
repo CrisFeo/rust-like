@@ -3,15 +3,6 @@ use std::cmp::Reverse;
 use std::io;
 
 #[derive(Debug)]
-pub struct Controls {
-  pub up: char,
-  pub down: char,
-  pub left: char,
-  pub right: char,
-  pub wait: char,
-}
-
-#[derive(Debug)]
 pub struct Ai {
   pub target: Id,
 }
@@ -67,6 +58,7 @@ impl World {
 
   pub fn startup(&mut self) {
     update_fov(self);
+    update_timeline(self);
     update_ui(self);
   }
 

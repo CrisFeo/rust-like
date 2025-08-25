@@ -132,7 +132,7 @@ fn set_up_input_event(event_sender: mpsc::Sender<Event>) {
 
 fn set_up_tick_event(event_sender: mpsc::Sender<Event>) {
   thread::spawn(move || {
-    let delay = time::Duration::from_millis(50);
+    let delay = time::Duration::from_millis(100);
     loop {
       thread::sleep(delay);
       let now = time::Instant::now();

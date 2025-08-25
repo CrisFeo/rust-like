@@ -41,6 +41,6 @@ impl<T> Ord for Scheduled<T> {
 
 impl<T> PartialOrd for Scheduled<T> {
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    Some(other.0.cmp(&self.0))
+    Some(self.cmp(other))
   }
 }

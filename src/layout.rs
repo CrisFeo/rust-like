@@ -86,9 +86,7 @@ impl<'a> WidgetTree<'a> {
     let mut global = (0, 0);
     let mut parent_id = Some(&id);
     while let Some(id) = parent_id {
-      let Some(local) = self.position.get(id).map(|p| (p.0, p.1)) else {
-        return None;
-      };
+      let local = self.position.get(id).map(|p| (p.0, p.1))?;
       global.0 += local.0;
       global.1 += local.1;
       parent_id = self.parent.get(id);

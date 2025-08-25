@@ -1,4 +1,5 @@
 pub mod action;
+pub mod controls;
 pub mod activity;
 pub mod event;
 pub mod grid;
@@ -14,6 +15,7 @@ pub mod visibility;
 pub mod world;
 
 pub use action::*;
+pub use controls::*;
 pub use activity::*;
 pub use event::*;
 pub use id::Id;
@@ -22,7 +24,7 @@ pub use layout::*;
 pub use relations::*;
 pub use terminal::Terminal;
 pub use timeline::Timeline;
-pub use turn::*;
+pub use turn::TurnType;
 pub use ui::*;
 pub use visibility::*;
 pub use world::*;

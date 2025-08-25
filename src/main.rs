@@ -17,21 +17,32 @@ fn main() {
     world.controls.insert(
       id,
       Controls {
-        up: 'k',
-        down: 'j',
-        left: 'h',
-        right: 'l',
-        wait: ' ',
+        act_up: 'k',
+        act_down: 'j',
+        act_left: 'h',
+        act_right: 'l',
+        act_center: 'g',
+        activity_previous: 'y',
+        activity_next: 'u',
       },
     );
     world.health.insert(id, 3);
     world
       .fov
       .insert(id, FieldOfView::new(visibility_cache.clone()));
-    world.timeline.push(0, Event::Turn(id, Turn::Player));
+    world.timeline.push(0, turn::Player::new_turn(id));
     world.provides_activity.insert(
       id,
       Activity {
+        name: "Hold",
+        speed: 3,
+        activity_type: ActivityType::Wait(),
+      },
+    );
+    world.provides_activity.insert(
+      id,
+      Activity {
+        name: "Walk",
         speed: 5,
         activity_type: ActivityType::Step(),
       },
@@ -45,6 +56,7 @@ fn main() {
       world.provides_activity.insert(
         id,
         Activity {
+          name: "Stab",
           speed: 5,
           activity_type: ActivityType::MeleeAttack(1),
         },
@@ -65,12 +77,11 @@ fn main() {
     world.solidity.insert(id);
     world.ai.insert(id, Ai { target: player });
     world.health.insert(id, 1);
-    world
-      .timeline
-      .push(0, Event::Turn(id, Turn::Ai(Some(Action::Move((0, 0))))));
+    world.timeline.push(0, turn::Ai::new_turn(id, None));
     world.provides_activity.insert(
       id,
       Activity {
+        name: "Walk",
         speed: 10,
         activity_type: ActivityType::Step(),
       },
@@ -84,6 +95,7 @@ fn main() {
       world.provides_activity.insert(
         id,
         Activity {
+          name: "Wallop",
           speed: 10,
           activity_type: ActivityType::MeleeAttack(1),
         },
