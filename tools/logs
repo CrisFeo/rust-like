@@ -1,0 +1,5 @@
+#!/bin/sh
+set -euf
+source "$(dirname "$0")/config"
+
+less -R logs.txt

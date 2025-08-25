@@ -1,0 +1,13 @@
+#!/bin/sh
+set -euf
+source "$(dirname "$0")/config"
+
+task="$1"
+
+while :; do
+  output="$( eval "$task" 2>&1 || :)"
+  clear
+  echo "=== $task ==="
+  echo "$output"
+  sleep 1
+done

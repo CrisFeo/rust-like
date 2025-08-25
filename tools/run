@@ -1,0 +1,5 @@
+#!/bin/sh
+set -euf
+source "$(dirname "$0")/config"
+
+cargo run $CARGO_ARGS --color always 2> logs.txt
