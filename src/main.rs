@@ -77,7 +77,7 @@ fn main() {
     world.solidity.insert(id);
     world.ai.insert(id, Ai { target: player });
     world.health.insert(id, 1);
-    world.timeline.push(0, turn::Ai::new_turn(id, None));
+    world.timeline.push(0, turn::Ai::new_turn(id));
     world.provides_activity.insert(
       id,
       Activity {

@@ -2,11 +2,6 @@ use crate::*;
 use std::cmp::Reverse;
 use std::io;
 
-#[derive(Debug)]
-pub struct Ai {
-  pub target: Id,
-}
-
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Layer {
   Map,
@@ -188,4 +183,11 @@ fn update_fov(world: &mut World) {
       false
     });
   }
+}
+
+pub fn can_see(world: &World, a: Id, b: Id) -> Option<bool> {
+  let fov = world.fov.get(&a)?;
+  let a = world.position.get_right(&a)?;
+  let b = world.position.get_right(&b)?;
+  Some(fov.is_visible((b.0 - a.0, b.1 - a.1)))
 }

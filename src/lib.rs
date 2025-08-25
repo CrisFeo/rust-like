@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod action;
 pub mod controls;
 pub mod activity;
@@ -14,6 +15,7 @@ pub mod ui;
 pub mod visibility;
 pub mod world;
 
+pub use ai::*;
 pub use action::*;
 pub use controls::*;
 pub use activity::*;

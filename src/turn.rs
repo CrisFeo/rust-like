@@ -92,79 +92,24 @@ impl Player {
 }
 
 #[derive(Debug)]
-pub struct Ai {
-  pub pending_action: Option<Action>,
-}
+pub struct Ai();
 
 impl Ai {
-  pub fn new_turn(id: Id, action: Option<Action>) -> Event {
-    let turn = Self {
-      pending_action: action,
-    };
-    Event::Turn(id, TurnType::Ai(turn))
+  pub fn new_turn(id: Id) -> Event {
+    Event::Turn(id, TurnType::Ai(Self()))
   }
 
   fn update(self, world: &mut World, id: Id) {
-    if let Some(pending_action) = self.pending_action {
-      update_action(world, id, pending_action);
+    if let (_, Some(action)) = pick_ai_action(world, id) {
+      update_action(world, id, action);
     }
-    let Some(ai) = world.ai.get(&id) else {
-      return;
-    };
-    let Some(position) = world.position.get_right(&id) else {
-      return;
-    };
-    let Some(target_position) = world.position.get_right(&ai.target) else {
-      return;
-    };
-    let target_vector = (
-      target_position.0 - position.0,
-      target_position.1 - position.1,
-    );
-    let vector = if target_vector.0.abs() > target_vector.1.abs() {
-      (target_vector.0.signum(), 0)
-    } else {
-      (0, target_vector.1.signum())
-    };
-    let desired_position = (position.0 + vector.0, position.1 + vector.1);
-    let mut speed = 1;
-    let mut action = None;
-    if let Some(move_speed) = pick_step(world, id) {
-      speed = move_speed;
-      action = Some(Action::Move(vector));
-      if let Some((attack_speed, attack_damage)) = pick_melee_attack(world, id) {
-        if desired_position == *target_position {
-          speed = attack_speed;
-          action = Some(Action::Attack(vector, attack_damage));
-        }
-      }
-    }
+    let (speed, _) = pick_ai_action(world, id);
     world.timeline.push(
       world.time + speed,
       Event::Turn(
         id,
-        TurnType::Ai(Self {
-          pending_action: action,
-        }),
+        TurnType::Ai(Self()),
       ),
     );
   }
-}
-
-fn pick_step(world: &World, id: Id) -> Option<usize> {
-  collect_activities(world, id)
-    .find(|(_, activity)| matches!(activity.activity_type, ActivityType::Step()))
-    .map(|(_, activity)| activity.speed)
-}
-
-fn pick_melee_attack(world: &World, id: Id) -> Option<(usize, i32)> {
-  collect_activities(world, id)
-    .filter_map(|(_, activity)| {
-      if let ActivityType::MeleeAttack(damage) = activity.activity_type {
-        Some((activity.speed, damage))
-      } else {
-        None
-      }
-    })
-    .next()
 }

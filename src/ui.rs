@@ -56,19 +56,26 @@ fn timeline(world: &World) -> WidgetFn<'static> {
   let format_event = |time: usize, event: &Event| {
     let (icon, description) = match event {
       Event::Turn(id, turn) => {
+        if Some(false) == can_see(world, world.view_target, *id) {
+          return None;
+        }
         let icon = world.icon.get(id)?;
         let description = match turn {
           TurnType::Player(_) => "turn".to_string(),
-          TurnType::Ai(ai) => format_action_description(&ai.pending_action),
+          TurnType::Ai(_) => {
+            let (_, predicted_action) = pick_ai_action(world, *id);
+            format_action_description(&predicted_action)
+          },
         };
         (icon, description)
-      } //      Event::Action(id, action) => {
-        //        let Some(icon) = world.icon.get(id) else {
-        //          return None;
-        //        };
-        //        let description = format_action_description(action);
-        //        (icon, description)
-        //      }
+      }
+      //Event::Action(id, action) => {
+      //  let Some(icon) = world.icon.get(id) else {
+      //    return None;
+      //  };
+      //  let description = format_action_description(action);
+      //  (icon, description)
+      //}
     };
     let time = time - world.time;
     Some((time.to_string(), icon.to_string(), description))
