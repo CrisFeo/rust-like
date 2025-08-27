@@ -34,17 +34,17 @@ fn main() {
     world.provides_activity.insert(
       id,
       Activity {
-        name: "Hold",
-        speed: 3,
-        activity_type: ActivityType::Wait(),
+        name: "Walk",
+        speed: 5,
+        activity_type: ActivityType::Step(),
       },
     );
     world.provides_activity.insert(
       id,
       Activity {
-        name: "Walk",
-        speed: 5,
-        activity_type: ActivityType::Step(),
+        name: "Hold",
+        speed: 3,
+        activity_type: ActivityType::Wait(),
       },
     );
     let sword = {

@@ -2,6 +2,7 @@ use crate::*;
 
 #[derive(Debug)]
 pub struct Ai {
+  // TODO switch ai to use a "target nav map" instead of a specific target id
   pub target: Id,
 }
 
@@ -12,29 +13,21 @@ pub fn pick_ai_action(world: &World, id: Id) -> (usize, Option<Action>) {
   let Some(position) = world.position.get_right(&id) else {
     return (1, None);
   };
-  let Some(target_position) = world.position.get_right(&ai.target) else {
+  let Some(navigation) = world.navigation.best_neighbor(*position) else {
     return (1, None);
   };
-  let target_vector = (
-    target_position.0 - position.0,
-    target_position.1 - position.1,
-  );
-  let vector = if target_vector.0.abs() > target_vector.1.abs() {
-    (target_vector.0.signum(), 0)
-  } else {
-    (0, target_vector.1.signum())
-  };
-  let desired_position = (position.0 + vector.0, position.1 + vector.1);
+  let (desired_position, remaining_steps) = navigation;
   let activities = collect_activities(world, id).collect::<Vec<_>>();
   let mut speed = 1;
   let mut action = None;
   if let Some(move_speed) = pick_step(&activities) {
+    let move_vector = (desired_position.0 - position.0, desired_position.1 - position.1);
     speed = move_speed;
-    action = Some(Action::Move(vector));
-    if let Some((attack_speed, attack_damage)) = pick_melee_attack(&activities) {
-      if desired_position == *target_position {
+    action = Some(Action::Move(move_vector));
+    if remaining_steps == 0 {
+      if let Some((attack_speed, attack_damage)) = pick_melee_attack(&activities) {
         speed = attack_speed;
-        action = Some(Action::Attack(vector, attack_damage));
+        action = Some(Action::Attack(move_vector, attack_damage));
       }
     }
   }

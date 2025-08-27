@@ -9,13 +9,22 @@ pub enum Layer {
 }
 
 #[derive(Default)]
+pub enum ViewType {
+  #[default]
+  Normal,
+  Navigation,
+}
+
+#[derive(Default)]
 pub struct World {
   pub input: Input,
   pub ui: WidgetTree<'static>,
   pub viewport_id: Id,
+  pub view_type: ViewType,
   pub tick: usize,
   pub time: usize,
   pub timeline: Timeline<Event>,
+  pub auto_step: Option<usize>,
   pub current_event: Option<Event>,
   pub view_target: Id,
   pub exists: Is<Id>,
@@ -27,6 +36,7 @@ pub struct World {
   pub opacity: Is<Id>,
   pub controls: HasOne<Id, Controls>,
   pub ai: HasOne<Id, Ai>,
+  pub navigation: Navigation,
   pub health: HasOne<Id, i32>,
   pub fov: HasOne<Id, FieldOfView>,
   pub held_by: ManyToOne<Id, Id>,
@@ -53,12 +63,15 @@ impl World {
 
   pub fn startup(&mut self) {
     update_fov(self);
+    update_navigation(self);
     update_timeline(self);
     update_ui(self);
   }
 
   pub fn update(&mut self, input: char) {
     self.input = Input::Some(input);
+    update_view_type(self);
+    let last_input_time = self.time;
     loop {
       update_timeline(self);
       if self.current_event.is_none() {
@@ -74,8 +87,15 @@ impl World {
       update_current_event(self);
       update_dead_entities(self);
       update_fov(self);
+      update_navigation(self);
       if self.input.is_requested() {
         break;
+      }
+      if let Some(interval) = self.auto_step {
+        let elapsed_time = self.time - last_input_time;
+        if elapsed_time > interval {
+          break;
+        }
       }
     }
     update_ui(self);
@@ -93,35 +113,54 @@ impl World {
   }
 
   fn draw_viewport(&self, terminal: &mut Terminal, offset: (i32, i32), size: (i32, i32)) {
-    let target = self
+    let view_position = self
       .position
       .get_right(&self.view_target)
       .unwrap_or(&(0, 0));
-    let to_screen = ((-size.0 / 2) + target.0, (-size.1 / 2) + target.1);
+    let to_screen = ((-size.0 / 2) + view_position.0, (-size.1 / 2) + view_position.1);
     for column in 0..size.0 {
       for row in 0..size.1 {
-        let world = (to_screen.0 + column, to_screen.1 + row);
-        let mut is_visible = true;
-        if let Some(fov) = self.fov.get(&self.view_target) {
-          let vision = (world.0 - target.0, world.1 - target.1);
-          is_visible = fov.is_visible(vision);
-        }
-        let char = match self.position.get_lefts(&world) {
-          None => ' ',
-          Some(ids) => {
-            if is_visible {
-              let mut ids = ids.iter().collect::<Vec<_>>();
-              ids.sort_by_key(|id| Reverse(self.layer.get(id)));
-              *ids.first().and_then(|id| self.icon.get(id)).unwrap_or(&' ')
-            } else {
-              '~'
-            }
-          }
+        let cell_position = (to_screen.0 + column, to_screen.1 + row);
+        let char = match self.view_type {
+          ViewType::Normal => draw_normal_cell(self, *view_position, cell_position),
+          ViewType::Navigation => draw_navigation_cell(self, *view_position, cell_position),
         };
+        let char = char.unwrap_or(' ');
         let screen = (offset.0 + column, offset.1 + row);
         terminal.set(screen, char);
       }
     }
+  }
+}
+
+fn draw_normal_cell(
+  world: &World,
+  view_position: (i32, i32),
+  cell_position: (i32, i32),
+) -> Option<char> {
+  if let Some(fov) = world.fov.get(&world.view_target) {
+    let vision = (cell_position.0 - view_position.0, cell_position.1 - view_position.1);
+    if !fov.is_visible(vision) {
+      return Some('~');
+    }
+  }
+  let ids = world.position.get_lefts(&cell_position)?;
+  let mut ids = ids.iter().collect::<Vec<_>>();
+  ids.sort_by_key(|id| Reverse(world.layer.get(id)));
+  let id = ids.first()?;
+  world.icon.get(id).copied()
+}
+
+fn draw_navigation_cell(
+  world: &World,
+  _view_position: (i32, i32),
+  cell_position: (i32, i32),
+) -> Option<char> {
+  let value = world.navigation.get_value(cell_position)?;
+  let char = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".chars().nth(value);
+  match char {
+    Some(char) => Some(char),
+    None => Some('!'),
   }
 }
 
@@ -134,6 +173,14 @@ fn update_timeline(world: &mut World) {
   };
   world.time = time;
   world.current_event = Some(event);
+}
+
+fn update_view_type(world: &mut World) {
+  if world.input.try_consume('1') {
+    world.view_type = ViewType::Normal;
+  } else if world.input.try_consume('2') {
+    world.view_type = ViewType::Navigation;
+  }
 }
 
 fn update_dead_entities(world: &mut World) {
@@ -158,6 +205,7 @@ fn update_dead_view_target(world: &mut World, id: Id) {
   };
   let id = Id::new();
   world.position.insert(id, *position);
+  world.auto_step = Some(10);
   world.view_target = id;
 }
 
@@ -183,6 +231,33 @@ fn update_fov(world: &mut World) {
       false
     });
   }
+}
+
+fn update_navigation(world: &mut World) {
+  world.navigation.reset();
+  // TODO formalize this radius when map generation is implemented
+	for position in grid::spiral((0, 0), 50) {
+    let Some(ids) = world.position.get_lefts(&position) else {
+      continue;
+    };
+    // TODO switch map representation from "default open" to "default solid"
+    let mut is_solid = false;
+    for id in ids {
+      if world.solidity.contains(id) {
+        is_solid = true;
+        break;
+      }
+    }
+    if !is_solid {
+      world.navigation.set_value(position, usize::MAX);
+    }
+	}
+  if let Some(position) = world.position.get_right(&world.view_target) {
+    if world.health.contains_key(&world.view_target) {
+      world.navigation.set_value(*position, 0);
+    }
+  }
+  world.navigation.calculate();
 }
 
 pub fn can_see(world: &World, a: Id, b: Id) -> Option<bool> {
