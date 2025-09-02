@@ -103,13 +103,15 @@ impl Ai {
     if let (_, Some(action)) = pick_ai_action(world, id) {
       update_action(world, id, action);
     }
-    let (speed, _) = pick_ai_action(world, id);
-    world.timeline.push(
-      world.time + speed,
-      Event::Turn(
-        id,
-        TurnType::Ai(Self()),
-      ),
-    );
+    let (speed, action) = pick_ai_action(world, id);
+    if action.is_some() {
+      world.timeline.push(
+        world.time + speed,
+        Event::Turn(
+          id,
+          TurnType::Ai(Self()),
+        ),
+      );
+    }
   }
 }

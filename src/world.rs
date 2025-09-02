@@ -13,6 +13,7 @@ pub enum ViewType {
   #[default]
   Normal,
   Navigation,
+  Revealed,
 }
 
 #[derive(Default)]
@@ -27,7 +28,6 @@ pub struct World {
   pub auto_step: Option<usize>,
   pub current_event: Option<Event>,
   pub view_target: Id,
-  pub exists: Is<Id>,
   pub name: HasOne<Id, &'static str>,
   pub icon: HasOne<Id, char>,
   pub layer: HasOne<Id, Layer>,
@@ -45,7 +45,6 @@ pub struct World {
 
 impl World {
   pub fn remove_entity(&mut self, id: &Id) {
-    self.exists.remove(id);
     self.name.remove(id);
     self.icon.remove(id);
     self.layer.remove(id);
@@ -70,10 +69,10 @@ impl World {
 
   pub fn update(&mut self, input: char) {
     self.input = Input::Some(input);
-    update_view_type(self);
+    instrument!("update_view_type", update_view_type(self));
     let last_input_time = self.time;
     loop {
-      update_timeline(self);
+      instrument!("update_timeline", update_timeline(self));
       if self.current_event.is_none() {
         break;
       }
@@ -84,10 +83,10 @@ impl World {
         self.input,
         self.current_event,
       );
-      update_current_event(self);
-      update_dead_entities(self);
-      update_fov(self);
-      update_navigation(self);
+      instrument!("update_current_event", update_current_event(self));
+      instrument!("update_dead_entities", update_dead_entities(self));
+      instrument!("update_fov", update_fov(self));
+      instrument!("update_navigation", update_navigation(self));
       if self.input.is_requested() {
         break;
       }
@@ -98,7 +97,7 @@ impl World {
         }
       }
     }
-    update_ui(self);
+    instrument!("update_ui", update_ui(self));
   }
 
   pub fn draw(&mut self, terminal: &mut Terminal) -> io::Result<()> {
@@ -123,6 +122,7 @@ impl World {
         let cell_position = (to_screen.0 + column, to_screen.1 + row);
         let char = match self.view_type {
           ViewType::Normal => draw_normal_cell(self, *view_position, cell_position),
+          ViewType::Revealed => draw_revealed_cell(self, *view_position, cell_position),
           ViewType::Navigation => draw_navigation_cell(self, *view_position, cell_position),
         };
         let char = char.unwrap_or(' ');
@@ -144,6 +144,18 @@ fn draw_normal_cell(
       return Some('~');
     }
   }
+  let ids = world.position.get_lefts(&cell_position)?;
+  let mut ids = ids.iter().collect::<Vec<_>>();
+  ids.sort_by_key(|id| Reverse(world.layer.get(id)));
+  let id = ids.first()?;
+  world.icon.get(id).copied()
+}
+
+fn draw_revealed_cell(
+  world: &World,
+  view_position: (i32, i32),
+  cell_position: (i32, i32),
+) -> Option<char> {
   let ids = world.position.get_lefts(&cell_position)?;
   let mut ids = ids.iter().collect::<Vec<_>>();
   ids.sort_by_key(|id| Reverse(world.layer.get(id)));
@@ -180,6 +192,8 @@ fn update_view_type(world: &mut World) {
     world.view_type = ViewType::Normal;
   } else if world.input.try_consume('2') {
     world.view_type = ViewType::Navigation;
+  } else if world.input.try_consume('3') {
+    world.view_type = ViewType::Revealed;
   }
 }
 
@@ -235,23 +249,6 @@ fn update_fov(world: &mut World) {
 
 fn update_navigation(world: &mut World) {
   world.navigation.reset();
-  // TODO formalize this radius when map generation is implemented
-	for position in grid::spiral((0, 0), 50) {
-    let Some(ids) = world.position.get_lefts(&position) else {
-      continue;
-    };
-    // TODO switch map representation from "default open" to "default solid"
-    let mut is_solid = false;
-    for id in ids {
-      if world.solidity.contains(id) {
-        is_solid = true;
-        break;
-      }
-    }
-    if !is_solid {
-      world.navigation.set_value(position, usize::MAX);
-    }
-	}
   if let Some(position) = world.position.get_right(&world.view_target) {
     if world.health.contains_key(&world.view_target) {
       world.navigation.set_value(*position, 0);

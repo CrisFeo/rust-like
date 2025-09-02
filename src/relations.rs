@@ -59,6 +59,10 @@ where
     self.map.get(left)
   }
 
+  pub fn get_mut(&mut self, left: &L) -> Option<&mut R> {
+    self.map.get_mut(left)
+  }
+
   pub fn iter(&self) -> hash_map::Iter<'_, L, R> {
     self.map.iter()
   }

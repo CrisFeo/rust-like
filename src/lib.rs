@@ -7,6 +7,8 @@ pub mod grid;
 pub mod id;
 pub mod input;
 pub mod layout;
+pub mod logging;
+pub mod mapping;
 pub mod navigation;
 pub mod relations;
 pub mod terminal;
@@ -33,20 +35,3 @@ pub use turn::TurnType;
 pub use ui::*;
 pub use visibility::*;
 pub use world::*;
-
-#[macro_export]
-macro_rules! log {
-  ($system: expr, $message:expr, $($args:expr),+ $(,)?) => {
-    eprintln!(
-      concat!(
-        "[{}] {}",
-        $(
-          concat!("\n  ", stringify!($args), ": {:?}")
-        ),+,
-      ),
-      $system,
-      $message,
-      $($args),+
-    );
-  }
-}

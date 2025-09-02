@@ -2,17 +2,25 @@ use rust_like::*;
 use std::rc::Rc;
 
 fn main() {
+  let mut terminal = Terminal::new().unwrap();
+  let visibility_cache = Rc::new(VisibilityCache::new(100));
   let mut world = World::default();
 
-  let visibility_cache = Rc::new(VisibilityCache::new(100));
+
+  terminal.set_str((0, 0),"generating dungeon...");
+  terminal.present().unwrap();
+
+  instrument!("mapping", {
+    //mapping::arena(&mut world);
+    mapping::cavern(&mut world, 41, 10000, 10000);
+  });
 
   let player = {
     let id = world.view_target;
-    world.exists.insert(id);
     world.name.insert(id, "Player");
     world.icon.insert(id, '@');
     world.layer.insert(id, Layer::Mob);
-    world.position.insert(id, (4, 4));
+    world.position.insert(id, (0, 0));
     world.solidity.insert(id);
     world.controls.insert(
       id,
@@ -49,7 +57,6 @@ fn main() {
     );
     let sword = {
       let id = Id::new();
-      world.exists.insert(id);
       world.name.insert(id, "Arming Sword");
       world.icon.insert(id, '/');
       world.layer.insert(id, Layer::Mob);
@@ -69,7 +76,6 @@ fn main() {
 
   let mut goblin = |i, p| {
     let id = Id::new();
-    world.exists.insert(id);
     world.name.insert(id, "Goblin");
     world.icon.insert(id, i);
     world.layer.insert(id, Layer::Mob);
@@ -88,7 +94,6 @@ fn main() {
     );
     let club = {
       let id = Id::new();
-      world.exists.insert(id);
       world.name.insert(id, "Crude Club");
       world.icon.insert(id, '!');
       world.layer.insert(id, Layer::Mob);
@@ -109,57 +114,12 @@ fn main() {
   _ = goblin('N', (9, 2));
   _ = goblin('T', (8, 5));
 
-  let size = 20;
-  for y in 0..size {
-    for x in 0..size {
-      let position = (x, y);
-      let is_wall = match position {
-        (0, _) => true,
-        (x, _) if x == size - 1 => true,
-        (_, 0) => true,
-        (_, y) if y == size - 1 => true,
-        _ => false,
-      };
-      let id = Id::new();
-      world.exists.insert(id);
-      world.position.insert(id, position);
-      world.layer.insert(id, Layer::Map);
-      if is_wall {
-        world.name.insert(id, "wall");
-        world.icon.insert(id, '#');
-        world.solidity.insert(id);
-        world.opacity.insert(id);
-      } else {
-        world.name.insert(id, "floor");
-        world.icon.insert(id, '.');
-      }
-    }
-  }
-
-  let mut pillar = |p| {
-    let id = Id::new();
-    world.exists.insert(id);
-    world.name.insert(id, "pillar");
-    world.icon.insert(id, 'o');
-    world.layer.insert(id, Layer::Mob);
-    world.position.insert(id, p);
-    world.solidity.insert(id);
-    world.opacity.insert(id);
-    id
-  };
-  pillar((5, 5));
-  pillar((5, 6));
-  pillar((5, 7));
-  pillar((4, 7));
-  pillar((4, 9));
-
   world.startup();
 
-  let mut t = Terminal::new().unwrap();
   loop {
-    world.draw(&mut t).unwrap();
+    instrument!("draw", world.draw(&mut terminal).unwrap());
     use terminal::Event::*;
-    match t.poll() {
+    match terminal.poll() {
       Tick(_) => {
         world.tick += 1;
       }
@@ -167,7 +127,7 @@ fn main() {
         if char == 'q' {
           break;
         }
-        world.update(char);
+        instrument!("world update", world.update(char));
       }
     }
   }

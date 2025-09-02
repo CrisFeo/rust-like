@@ -72,8 +72,8 @@ impl<'a> Terminal<'a> {
 
   pub fn dimensions(&self) -> Result<(i32, i32)> {
     unsafe {
-      let size: libc::winsize = mem::zeroed();
-      let result = libc::ioctl(0, libc::TIOCGWINSZ, &size);
+      let mut size: libc::winsize = mem::zeroed();
+      let result = libc::ioctl(0, libc::TIOCGWINSZ, &mut size);
       if result == -1 {
         return Err(Error::last_os_error());
       }
@@ -89,6 +89,13 @@ impl<'a> Terminal<'a> {
 
   pub fn set(&mut self, point: Point, c: char) {
     self.buffer.insert((point.0 + 1, point.1 + 1), c);
+  }
+
+  pub fn set_str(&mut self, point: Point, s: &str) {
+    for (i, c) in s.chars().enumerate() {
+      let (x, y) = point;
+      self.set((x + i as i32, y), c);
+    }
   }
 
   pub fn present(&mut self) -> Result<()> {

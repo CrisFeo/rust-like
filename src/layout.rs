@@ -1,4 +1,3 @@
-use crate::log;
 use crate::Id;
 use crate::Terminal;
 use std::borrow::Cow;
@@ -342,7 +341,7 @@ impl<'a> WidgetTree<'a> {
       .geometry
       .get(&id)
       .expect("widget should have a geometry during draw");
-    log!("LAYOUT", "drawing widget", id, widget, position, geometry);
+    //crate::log!("LAYOUT", "drawing widget", id, widget, position, geometry);
     match widget {
       Widget::Fill(char) => {
         for column in 0..geometry.width {

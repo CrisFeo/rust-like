@@ -8,11 +8,17 @@ pub struct Navigation {
 
 impl Navigation {
   pub fn reset(&mut self) {
-    self.cells.clear();
+    for (_, cell) in self.cells.iter_mut() {
+      *cell = usize::MAX;
+    }
   }
 
   pub fn set_value(&mut self, point: Point, value: usize) {
     self.cells.insert(point, value);
+  }
+
+  pub fn remove_point(&mut self, point: Point) {
+    self.cells.remove(&point);
   }
 
   pub fn get_value(&self, point: Point) -> Option<usize> {
